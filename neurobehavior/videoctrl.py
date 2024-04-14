@@ -1,0 +1,270 @@
+from PySide6.QtCore import Signal, Slot, Property, QObject
+from PySide6.QtCore import Qt
+from PySide6.QtCore import QMutex
+from PySide6.QtCore import QThread
+from PySide6.QtGui import QImage
+
+import os
+import time
+import numpy as np
+import cv2
+import subprocess
+
+QML_IMPORT_NAME = "neurobehavior"
+QML_IMPORT_MAJOR_VERSION = 1
+
+
+class VideoCtrl(QObject):
+    frameUpdated = Signal(QImage)
+    requestRecordStart = Signal(str)
+    requestRecordStop = Signal()
+
+    # cmd = "ffmpeg -use_wallclock_as_timestamps 1 -f mjpeg -i http://192.168.100.{}:8081/?action=stream -vcodec libx264 -y {}"
+
+    def __init__(self, app, video_index):
+        super().__init__(app)
+        self.app = app
+        self.video_index = video_index
+
+        self.frameLoader = FrameLoader(video_index)
+        self.frameLoader.frameUpdated.connect(self.frameUpdated)
+        self.frameLoader.connectionChanged.connect(self.onConnectionChanged)
+        self.frameLoader.start()
+        self.is_connected = False
+
+        self.videoWriterThread = None
+        self.videoWriter = None
+        self.is_recording = False
+
+        self.videoWriterThread = QThread()
+        self.videoWriter = VideoWriter()
+        self.videoWriter.moveToThread(self.videoWriterThread)
+        self.requestRecordStart.connect(self.videoWriter.recordStart)
+        self.requestRecordStop.connect(self.videoWriter.recordStop)
+        self.videoWriterThread.started.connect(self.videoWriter.initialize)
+        self.videoWriterThread.start()
+
+    def stop(self):
+        self.recordStop()
+        self.videoWriterThread.quit()
+        self.videoWriterThread.wait()
+        self.frameLoader.frameUpdated.disconnect(self.frameUpdated)
+        self.frameLoader.connectionChanged.disconnect(self.onConnectionChanged)
+        self.frameLoader.stop()
+        self.frameLoader.quit()
+        self.frameLoader.wait()
+
+    @Slot(bool)
+    def onConnectionChanged(self, is_connected):
+        self.is_connected = is_connected
+
+    def getVideoDir(self, session):
+        for cmbrname in self.app.chambers:
+            if self.app.chambers[cmbrname].videoCtrl == self:
+                idx = session.sessionParams["chambers"].index(cmbrname)
+                sbj = session.sessionParams["subjects"][idx]
+                exp = session.sessionParams["experiments"][idx]
+
+                datafilepath = self.app.makeDataPath(
+                    session.dataRoot,
+                    session.name,
+                    sbj, exp
+                )
+                return os.path.dirname(datafilepath)
+        return session.dataRoot
+
+    @Slot(str)
+    def recordStart(self, session):
+        if self.is_recording or not self.is_connected:
+            return
+
+        videoFile = os.path.join(
+            # session.dataRoot,
+            self.getVideoDir(session),
+            # "{}_video{:02}.mp4".format(session.name, self.video_index)
+            "{}_video{}.mp4".format(session.name, self.video_index)
+        )
+
+        # self.videoWriter.recordStart(videoFile)
+        self.requestRecordStart.emit(videoFile)
+        self.frameUpdated.connect(self.videoWriter.write)
+        self.is_recording = True
+
+        # ## test
+        # videoFile2 = videoFile.replace(".mp4", "_test.mp4")
+        # recCmd = self.cmd.format(100 + self.video_index, videoFile2)
+        # self.p_video = subprocess.Popen(recCmd, shell=True)
+        # ts much faster than behavior
+
+    @Slot()
+    def recordStop(self):
+        if not self.is_recording:
+            return
+        self.frameUpdated.disconnect(self.videoWriter.write)
+        # self.videoWriter.recordStop()
+        self.requestRecordStop.emit()
+        self.is_recording = False
+
+        # ## test
+        # self.p_video.terminate()
+
+
+class FrameLoader(QThread):
+    frameUpdated = Signal(QImage)
+    connectionChanged = Signal(bool)
+
+    def __init__(self, video_index, parent=None):
+        super().__init__(parent)
+        self.video_index = video_index
+        self.frameRate = 15
+        self.active = True
+        self.mutex = QMutex()
+
+    def run(self, record=False):
+        while True:
+            self.mutex.lock()
+            if not self.active:
+                self.mutex.unlock()
+                break
+            self.mutex.unlock()
+
+            self.cap1 = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+            self.cap2 = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+            if not self.cap1 or not self.cap1.isOpened():
+                time.sleep(1)
+                continue
+                # break
+            if not self.cap2 or not self.cap2.isOpened():
+                time.sleep(1)
+                continue
+                # break
+
+            self.connectionChanged.emit(True)
+
+            self.cap1.set(cv2.CAP_PROP_FPS, self.frameRate)
+            self.cap2.set(cv2.CAP_PROP_FPS, self.frameRate)
+            while True:
+                self.mutex.lock()
+                if not self.active:
+                    self.mutex.unlock()
+                    break
+                self.mutex.unlock()
+
+                ret1, frame1 = self.cap1.read()
+                ret2, frame2 = self.cap2.read()
+                if not ret1 or not ret2: 
+                    self.connectionChanged.emit(False)
+                    break
+
+                self.height1, self.width1, ch = frame1.shape
+                self.height2, self.width2, ch = frame2.shape
+                assert self.height1 == self.height2
+
+                frame = np.concatenate([frame1, frame2], axis=1)
+                img = QImage(frame,
+                             self.width1 * 2, self.height1, ch * self.width1 * 2,
+                             QImage.Format_BGR888)
+                
+                scaled_img = img.scaled(640 * 2, 480, Qt.KeepAspectRatio)
+
+                self.frameUpdated.emit(scaled_img)
+
+    @Slot()
+    def stop(self):
+        self.mutex.lock()
+        self.active = False
+        self.mutex.unlock()
+
+
+class VideoWriter(QObject):
+    @Slot()
+    def initialize(self):
+        self.width = 640 * 2
+        self.height = 480
+        self.frameRate = 15
+
+        self.videoFile = None
+        self.ts0 = 0
+        self.ts = np.array([])
+        self.iframe = 0
+
+        self.p_postprocesses = []
+
+    @Slot(QImage)
+    def write(self, image):
+        if not self.writer:
+            return
+
+        width = image.width()
+        height = image.height()
+
+        ptr = image.constBits()
+        frame = np.array(ptr).reshape(height, width, 3)  #  Copies the data
+
+        if self.iframe == 0:
+            self.writer.write(frame)  # duplicated frame for t = 0
+            self.ts0 = time.time() - self.ts0
+
+        # self.ts[self.iframe] = self.cap.get(cv2.CAP_PROP_POS_MSEC)
+        self.ts[self.iframe] = time.time()
+        self.writer.write(frame)
+        self.iframe += 1
+
+    @Slot(str)
+    def recordStart(self, videoFile):
+        videodir = os.path.dirname(videoFile)
+        if not os.path.exists(videodir):
+            os.makedirs(videodir)
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        self.writer = cv2.VideoWriter(
+            videoFile.replace(".mp4", "_raw.mp4"),
+            fourcc, self.frameRate, (self.width, self.height))
+
+        self.videoFile = videoFile
+        self.ts0 = time.time()  # ts of the 1st frame
+        self.ts = np.zeros(15 * 60 * 60 * 3)  # max 3 hour
+        self.iframe = 0
+
+    @Slot()
+    def recordStop(self):
+        self.writer.release()
+        self.writer = None
+
+        self.ts = self.ts[:self.iframe]
+        self.ts = (self.ts - self.ts[0] + self.ts0) * 1e3
+        self.ts = np.append(0, self.ts)
+        np.savetxt(self.videoFile.replace(".mp4", "_frametime.txt"),
+                   self.ts, fmt="%.3f")
+        try:
+            # os.system("ffmpeg -y -i {} -c:v libx264 {}".format(
+            #     self.videoFile.replace(".mp4", "_raw.mp4"),
+            #     self.videoFile.replace(".mp4", "_transcode.mp4")
+            # ))
+
+            # os.system("mp4fpsmod -t {} -o {} {}".format(
+            #     self.videoFile.replace(".mp4", "_frametime.txt"),
+            #     self.videoFile,
+            #     self.videoFile.replace(".mp4", "_transcode.mp4")
+            # ))
+
+            cmd_transcode = "ffmpeg -y -i {} -c:v libx264 {}".format(
+                self.videoFile.replace(".mp4", "_raw.mp4"),
+                self.videoFile.replace(".mp4", "_transcode.mp4")
+            )
+
+            cmd_tsfix = "mp4fpsmod -t {} -o {} {}".format(
+                self.videoFile.replace(".mp4", "_frametime.txt"),
+                self.videoFile,
+                self.videoFile.replace(".mp4", "_transcode.mp4")
+            )
+
+            self.p_postprocesses.append(subprocess.Popen(
+                "{} && {}".format(cmd_transcode, cmd_tsfix), shell=True))
+            # self.p_postprocess.wait()
+
+        except:
+            pass
+        # else:
+        #     os.unlink(self.videoFile.replace(".mp4", "_transcode.mp4"))
+        #     os.unlink(self.videoFile.replace(".mp4", "_raw.mp4"))

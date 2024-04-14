@@ -1,0 +1,20 @@
+from neurobehavior.protocol import ProtocolGiftTraining
+
+
+class ProtocolGiftTraining1(ProtocolGiftTraining):
+    name = "GiftStimTraining1"
+    params = dict(
+        session_duration=1200,
+        hab_duration=5,
+        iti_duration=3,
+        cue_duration=10,
+        trial_autostart=True,
+        reward_clear_on_autostart=False,
+        reward_duration=10,
+        reward_nose_wo_cue=True,
+        max_trial=100,
+        fake_reward_duration=10,
+        p_fake_reward_trial=0,
+        p_fake_reward_cue=0.5,
+        fr=1
+    )

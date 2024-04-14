@@ -1,0 +1,1 @@
+SUBSYSTEMS=="usb", KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="2341", ATTRS{idProduct}=="003e", SYMLINK+="pulsepal"
