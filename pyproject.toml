@@ -19,23 +19,3 @@ authors = [
 [project.gui-scripts]
 neurobehavior = "neurobehavior.main_gui:main_gui"
 
-# [build-system]
-# requires = ["setuptools"]
-# build-backend = "setuptools.build_meta"
-
-# [project]
-# name = "neurobehavior"
-# authors = [
-#   {name = "Jinhee Baek", email = "jinhee.baek@gmail.com"}
-# ]
-# dependencies = [
-#   "PySide6",
-#   "sqlalchemy",
-#   "pandas",
-#   "pyserial",
-#   "opencv-python"
-# ]
-# dynamic = ["version"]
-
-# [project.scripts]
-# neurobehavior = "neurobehavior.main_gui:main_gui"
