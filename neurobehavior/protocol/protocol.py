@@ -32,6 +32,7 @@ class Protocol(QObject):
 
     inputChanged = Signal(str, bool, arguments=["channel", "value"])
     outputChanged = Signal(str, bool, arguments=["channel", "value"])
+    gazingAngleUpdated = Signal(float)
 
     stateEntered = Signal(str)
     stateExited = Signal(str)

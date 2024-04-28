@@ -1,4 +1,4 @@
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Slot
 from PySide6.QtCore import QTimer
 from neurobehavior.protocol import Protocol
 from neurobehavior.protocol import State
@@ -11,7 +11,8 @@ class ProtocolOF(Protocol):
     name = "OFL"
     params = dict(
         habituation=3,
-        session_duration=8
+        session_duration=240,
+        gazing_angle_threshold=90
     )
 
     inp = [""]
@@ -27,9 +28,14 @@ class ProtocolOF(Protocol):
 
         self.timer.setDuration(self.params["session_duration"])
         self.timer.timeout.connect(self.finishProtocol)
+        self.is_gazing = False
+
+        self.setPulsepalParams.emit(0, 3600e3, 3600e3)
+        self.pulsepal = False
 
     def finalize(self):
-        return
+        self.gazingAngleUpdated.disconnect()
+        self.pulsepalTriggered.emit(0, False)
         # self.pulsepalTriggered.emit(0, False)
 
 
@@ -46,7 +52,20 @@ class StateCond(State):
         return
 
     def onEntered(self):
-        return
+        self.protocol.gazingAngleUpdated.connect(self.onGazingAngleUpdated)
         # self.startTimer(
         #     self.protocol.params["session_duration"] - self.protocol.params["habituation"])
+
+    @Slot(float)
+    def onGazingAngleUpdated(self, angle):
+        if not self.protocol.is_gazing and angle < self.protocol.params["gazing_angle_threshold"]:
+            print("laser on")
+            self.protocol.pulsepalTriggered.emit(0, True)
+            self.protocol.pulsepal = True
+            self.protocol.is_gazing = True
+        if angle >= self.protocol.params["gazing_angle_threshold"] and self.protocol.is_gazing:
+            print("laser off")
+            self.protocol.pulsepalTriggered.emit(0, False)
+            self.protocol.pulsepal = False
+            self.protocol.is_gazing = False
 

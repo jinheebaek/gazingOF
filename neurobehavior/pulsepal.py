@@ -24,7 +24,7 @@ class PulsePal(QObject):
         # self.__setup__()
         self.status = [0, 0, 0, 0]
 
-    def connect(self, port="/dev/pulsepal"):
+    def connect(self, port="COM3"):
         try:
             self.pp = PulsePalObject(port)
             print("pulsepal connected")

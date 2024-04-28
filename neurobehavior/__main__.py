@@ -27,7 +27,7 @@ def main_gui():
     QQuickStyle.setStyle("Material")
     engine = QQmlApplicationEngine()
 
-    qml_file = Path(__file__).parent / "../ui" / "main.qml"
+    qml_file = Path(__file__).parent / "main.qml"
     # qml_file = files("neurobehavior").joinpath("ui/main.qml")
 
     engine.load(qml_file)

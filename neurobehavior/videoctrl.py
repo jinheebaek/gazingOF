@@ -10,12 +10,15 @@ import numpy as np
 import cv2
 import subprocess
 
+from dlclive import DLCLive, Processor
+
 QML_IMPORT_NAME = "neurobehavior"
 QML_IMPORT_MAJOR_VERSION = 1
 
 
 class VideoCtrl(QObject):
     frameUpdated = Signal(QImage)
+    gazingAngleUpdated = Signal(float)
     requestRecordStart = Signal(str)
     requestRecordStop = Signal()
 
@@ -28,6 +31,7 @@ class VideoCtrl(QObject):
 
         self.frameLoader = FrameLoader(video_index)
         self.frameLoader.frameUpdated.connect(self.frameUpdated)
+        self.frameLoader.gazingAngleUpdated.connect(self.gazingAngleUpdated)
         self.frameLoader.connectionChanged.connect(self.onConnectionChanged)
         self.frameLoader.start()
         self.is_connected = False
@@ -43,12 +47,13 @@ class VideoCtrl(QObject):
         self.requestRecordStop.connect(self.videoWriter.recordStop)
         self.videoWriterThread.started.connect(self.videoWriter.initialize)
         self.videoWriterThread.start()
-
+        
     def stop(self):
         self.recordStop()
         self.videoWriterThread.quit()
         self.videoWriterThread.wait()
         self.frameLoader.frameUpdated.disconnect(self.frameUpdated)
+        self.frameLoader.gazingAngleUpdated.disconnect(self.gazingAngleUpdated)
         self.frameLoader.connectionChanged.disconnect(self.onConnectionChanged)
         self.frameLoader.stop()
         self.frameLoader.quit()
@@ -112,6 +117,7 @@ class VideoCtrl(QObject):
 class FrameLoader(QThread):
     frameUpdated = Signal(QImage)
     connectionChanged = Signal(bool)
+    gazingAngleUpdated = Signal(float)
 
     def __init__(self, video_index, parent=None):
         super().__init__(parent)
@@ -119,6 +125,10 @@ class FrameLoader(QThread):
         self.frameRate = 15
         self.active = True
         self.mutex = QMutex()
+        
+        self.dlc_proc = Processor()  
+        self.dlc_live = DLCLive("C:/Users/kimjg/Documents/Repository/gazingOF/model", processor=self.dlc_proc)
+        self.dlc_infer = None
 
     def run(self, record=False):
         while True:
@@ -128,8 +138,14 @@ class FrameLoader(QThread):
                 break
             self.mutex.unlock()
 
-            self.cap1 = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-            self.cap2 = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+            # vid1 = "C:\Users\kimjg\Documents\Repository\gazingOF\eOF01_ct_ob.mp4"
+            # vid2 = "C:\Users\kimjg\Documents\Repository\gazingOF\eOF01_ct_dm.mp4"
+            vid1 = "C:/Users/kimjg/Documents/Repository/gazingOF/eOF01_ct_dm.mp4"
+            vid2 = "C:/Users/kimjg/Documents/Repository/gazingOF/eOF01_ct_ob.mp4"
+            # self.cap1 = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+            # self.cap2 = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+            self.cap1 = cv2.VideoCapture(vid1)
+            self.cap2 = cv2.VideoCapture(vid2)
             if not self.cap1 or not self.cap1.isOpened():
                 time.sleep(1)
                 continue
@@ -139,8 +155,8 @@ class FrameLoader(QThread):
                 continue
                 # break
 
-            self.connectionChanged.emit(True)
-
+            self.connectionChanged.emit(True)   
+            intv = 1 / self.frameRate
             self.cap1.set(cv2.CAP_PROP_FPS, self.frameRate)
             self.cap2.set(cv2.CAP_PROP_FPS, self.frameRate)
             while True:
@@ -161,6 +177,38 @@ class FrameLoader(QThread):
                 assert self.height1 == self.height2
 
                 frame = np.concatenate([frame1, frame2], axis=1)
+
+                if self.dlc_infer is None:
+                    self.dlc_infer = self.dlc_live.init_inference(frame)
+                pose = self.dlc_live.get_pose(frame)
+
+                try: 
+                    c_lear = pose[0, :2]   
+                    c_rear = pose[1, :2]
+                    c_earcenter = (c_lear + c_rear) / 2
+                    c_demon = pose[3, :2]
+
+                    v_vert_3d = np.array([0, 0, -1])
+                    v_head = np.cross(v_vert_3d, np.append(c_rear - c_lear, 0))[:2]
+                    v_earcenter2dem = c_demon - c_earcenter
+                    v_head = v_head / np.linalg.norm(v_head)
+                    v_earcenter2dem = v_earcenter2dem / np.linalg.norm(v_earcenter2dem)
+
+                    cv2.circle(frame, c_lear.astype(int), 5, (0, 255, 0), -1)
+                    cv2.circle(frame, c_rear.astype(int), 5, (0, 255, 0), -1)
+                    
+                    c_earcenter_int = c_earcenter.astype(int)
+                    c_ear2demon_int = (c_earcenter + v_earcenter2dem * 70).astype(int)
+                    c_head_int = (c_earcenter + v_head * 70).astype(int)
+                    
+                    cv2.line(frame, c_earcenter_int, c_ear2demon_int, (255, 0, 0), 5)
+                    cv2.line(frame, c_earcenter_int, c_head_int, (0, 0, 255), 5)
+
+                    angle = np.arccos((np.dot(v_head, v_earcenter2dem) / np.linalg.norm(v_head) / np.linalg.norm(v_earcenter2dem)))
+                    self.gazingAngleUpdated.emit(np.rad2deg(angle))
+                except Exception:
+                    pass
+                    
                 img = QImage(frame,
                              self.width1 * 2, self.height1, ch * self.width1 * 2,
                              QImage.Format_BGR888)
@@ -168,6 +216,8 @@ class FrameLoader(QThread):
                 scaled_img = img.scaled(640 * 2, 480, Qt.KeepAspectRatio)
 
                 self.frameUpdated.emit(scaled_img)
+                time.sleep(intv)
+            self.dlc_infer = None
 
     @Slot()
     def stop(self):

@@ -13,7 +13,7 @@ from PySide6.QtQml import QmlElement
 
 from neurobehavior.session import Session
 from neurobehavior.chamber import Chamber
-from neurobehavior.chamber_local import ChamberLocal
+# from neurobehavior.chamber_local import ChamberLocal
 from neurobehavior.chamberserver import ChamberServer
 from neurobehavior.videoctrl import VideoCtrl
 from neurobehavior.dbmodels import Base, SessionModel, ChamberModel, DataModel
@@ -133,7 +133,7 @@ class Neurobehavior(QObject):
             return
 
         cmbrThread = QThread()
-        cmbr = ChamberLocal(configs)
+        cmbr = Chamber(configs)
         cmbr.moveToThread(cmbrThread)
 
         cmbr.inputChanged.connect(
@@ -173,6 +173,7 @@ class Neurobehavior(QObject):
         cmbrThread.start()
 
         cmbr.videoCtrl = VideoCtrl(self, int(name.lstrip("chamber")))
+        cmbr.videoCtrl.gazingAngleUpdated.connect(cmbr.gazingAngleUpdated)
 
         self.chambers[name] = cmbr
         self.chamberThreads[name] = cmbrThread

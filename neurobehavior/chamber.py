@@ -22,6 +22,7 @@ class Chamber(QObject):
     stateListChanged = Signal(list)
     inputChanged = Signal(str, bool, arguments=["channel", "value"])
     outputChanged = Signal(str, bool, arguments=["channel", "value"])
+    gazingAngleUpdated = Signal(float)
     stateEntered = Signal(str, str)
     stateExited = Signal(str, str)
 
@@ -214,6 +215,7 @@ class Chamber(QObject):
         self.protocol.startProtocol()
         self.inputChanged.connect(self.protocol.inputChanged)
         self.outputChanged.connect(self.protocol.outputChanged)
+        self.gazingAngleUpdated.connect(self.protocol.gazingAngleUpdated)
         self.status = "running"
 
     @Slot()
@@ -221,6 +223,7 @@ class Chamber(QObject):
         if self.protocol:
             self.inputChanged.disconnect(self.protocol.inputChanged)
             self.outputChanged.disconnect(self.protocol.outputChanged)
+            self.gazingAngleUpdated.disconnect(self.protocol.gazingAngleUpdated)
             self.protocol.stopProtocol()
             self.protocol.clearOutputRequested.disconnect()
             self.protocol.updateOutputRequested.disconnect()
