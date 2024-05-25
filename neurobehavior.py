@@ -14,7 +14,7 @@ from neurobehavior.sessionlistmodel import SessionListModel
 from neurobehavior.videoviewitem import VideoViewItem
 from neurobehavior.pulsepal import PulsePal
 from neurobehavior.seriallist import SerialList
-from neurobehavior.ardio import ArdIO
+# from neurobehavior.ardio import ArdIO
 from neurobehavior.datatablemodel import DataTableModel
 from neurobehavior.dbmodels import Base, SessionModel, ChamberModel, DataModel
 from neurobehavior.protocol import *

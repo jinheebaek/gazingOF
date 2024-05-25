@@ -19,6 +19,7 @@ from neurobehavior.videoctrl import VideoCtrl
 from neurobehavior.dbmodels import Base, SessionModel, ChamberModel, DataModel
 from neurobehavior.protocol import *
 from neurobehavior.pulsepal import PulsePal
+from neurobehavior.ardio import ArdIO
 
 QML_IMPORT_NAME = "neurobehavior"
 QML_IMPORT_MAJOR_VERSION = 1
@@ -75,6 +76,7 @@ class Neurobehavior(QObject):
         # self.chamberServerThread.start()
 
         self.pp = PulsePal(self)
+        self.ard = ArdIO(self)
 
         self.addChamber({
             "name": "chamber1",
@@ -162,6 +164,8 @@ class Neurobehavior(QObject):
         )
         cmbr.pulsepalTriggered.connect(self.pp.onPulsepalTriggered)
         cmbr.setPulsepalParams.connect(self.pp.setPulsepalParams)
+        cmbr.ardIOTriggered.connect(self.ard.onArdIOTriggered)
+        cmbr.ardIOCleared.connect(self.ard.clearOutput)
         self.updateOutput.connect(cmbr.onUpdateOutputBroadcast)
 
         self.chamberStartSession.connect(cmbr.onSessionStartRequested)
@@ -319,7 +323,7 @@ class Neurobehavior(QObject):
                 "sessionParams": db_session.session_params,
                 "protocolParams": db_session.protocol_params
             }
-
+    
             db.commit()
             db.close()
             self.loadSession(Session(self, sessionData))

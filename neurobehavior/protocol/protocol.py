@@ -39,6 +39,8 @@ class Protocol(QObject):
 
     pulsepalTriggered = Signal(int, bool)
     setPulsepalParams = Signal(int, float, float)
+    ardIOTriggered = Signal(int, bool)
+    ardIOCleared = Signal()
 
     name = ""
     inp = []

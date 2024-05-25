@@ -1,9 +1,10 @@
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot, QBitArray
 from PySide6.QtCore import qDebug
 from PySide6.QtCore import QTimer
 from PySide6.QtCore import QIODeviceBase
 from PySide6.QtSerialPort import QSerialPort
 
+import math
 import time
 
 
@@ -14,7 +15,9 @@ class ArdIO(QObject):
     outputMsgReceived = Signal(int)
     configMsgReceived = Signal(str)
 
-    def initialize(self):
+    # def initialize(self):
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.ard = QSerialPort()
         self.timer = QTimer()
         self.timer.setInterval(1)
@@ -22,7 +25,9 @@ class ArdIO(QObject):
         self.con_timer.setInterval(1000)
         self.con_timer.timeout.connect(self.connectArd)
         self.is_connected = False
-        self.port = ""
+        self.port = "COM4"
+        self.outputBits = QBitArray(2)
+        self.connectArd()
 
     @Slot()
     def setPort(self, port):
@@ -42,6 +47,7 @@ class ArdIO(QObject):
             qDebug("Arduino connected")
             time.sleep(1)
             self.ard.flush()
+            self.clearOutput()
             self.ard.errorOccurred.connect(self.onErrorOccurred)
             self.timer.timeout.connect(self.processMessage)
             self.timer.start()
@@ -61,6 +67,7 @@ class ArdIO(QObject):
         self.con_timer.stop()
 
         if self.is_connected:
+            self.clearOutput()
             self.ard.errorOccurred.disconnect(self.onErrorOccurred)
             self.timer.timeout.disconnect(self.processMessage)
             self.timer.stop()
@@ -89,3 +96,45 @@ class ArdIO(QObject):
         # qDebug("to Ard: {}".format(msg))
         if self.is_connected:
             self.ard.write(msg)
+
+    @Slot(int, list, result=bytes)
+    def encodeMsg(self, code, bits):
+        msg = 0
+        for i in range(len(bits)):
+            # msg += bits[i] * 2**(i)
+            msg |= bits[i] << i
+        msg = (int(msg)).to_bytes(math.ceil(len(bits)/8), byteorder="little")
+        msg = code.encode() + msg + "\r\n".encode()
+        return msg
+    
+    @Slot(int, bool)
+    def onArdIOTriggered(self, evtid, value):
+        """
+        Set output
+
+        Arguments
+        output: list of tuples, (outputname, switch)
+        """
+        nbit = math.ceil(len(self.outputBits)/8) * 8
+        update_on = [0] * nbit
+        update_off = [1] * nbit
+
+        if value:
+            update_on[evtid] = 1
+        else:
+            update_off[evtid] = 0
+
+        if sum(update_on) > 0:
+            msg_on = self.encodeMsg("+", update_on)
+            # self.ard.sendMessage(msg_on)
+            self.sendMessage(msg_on)
+        if sum(update_off) < nbit:
+            msg_off = self.encodeMsg("-", update_off)
+            # self.ard.sendMessage(msg_off)
+            self.sendMessage(msg_off)
+
+    @Slot()
+    def clearOutput(self):
+        msg = (0).to_bytes(math.ceil(len(self.outputBits)/8), byteorder="little")
+        msg = "o".encode() + msg + "\r\n".encode()
+        self.sendMessage(msg)

@@ -30,6 +30,9 @@ class State(QState):
     def initialize(self):
         return
 
+    def finalize(self):
+        return
+
     def beforeOnEntered(self):
         # print("t : {}".format(self.protocol.timer.elapsed()))
         # self.protocol.inputChanged.connect(self.recordInputChange)
@@ -108,4 +111,5 @@ class State(QState):
         self.protocol.resetLEDRequested.emit(output)
 
     def onProtocolStopped(self):
+        self.finalize()
         self.timer.stop()

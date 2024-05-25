@@ -4,7 +4,7 @@ from PySide6.QtCore import qDebug, qWarning
 from PySide6.QtQml import QmlElement
 
 import math
-from neurobehavior.ardio import ArdIO
+# from neurobehavior.ardio import ArdIO
 from neurobehavior.session import Session
 from neurobehavior.videoctrl import VideoCtrl
 
@@ -28,6 +28,8 @@ class Chamber(QObject):
 
     pulsepalTriggered = Signal(str, int, bool)
     setPulsepalParams = Signal(str, int, float, float)
+    ardIOTriggered = Signal(int, bool)
+    ardIOCleared = Signal()
 
     arduinoOutputRequested = Signal(bytes)
 
@@ -212,6 +214,8 @@ class Chamber(QObject):
         self.protocol.protocolFinished.connect(self.onProtocolFinished)
         self.protocol.pulsepalTriggered.connect(self.onPulsepalTriggered)
         self.protocol.setPulsepalParams.connect(self.onSetPulsepalParams)
+        self.protocol.ardIOTriggered.connect(self.ardIOTriggered)
+        self.protocol.ardIOCleared.connect(self.ardIOCleared)
         self.protocol.startProtocol()
         self.inputChanged.connect(self.protocol.inputChanged)
         self.outputChanged.connect(self.protocol.outputChanged)
@@ -240,6 +244,8 @@ class Chamber(QObject):
             self.protocol.protocolFinished.disconnect()
             self.protocol.pulsepalTriggered.disconnect()
             self.protocol.setPulsepalParams.disconnect()
+            self.protocol.ardIOTriggered.disconnect()
+            self.protocol.ardIOCleared.disconnect()
             self.protocol = None
         self.clearOutput()
         self.clearLED()
@@ -265,6 +271,8 @@ class Chamber(QObject):
         self.protocol.protocolFinished.disconnect()
         self.protocol.pulsepalTriggered.disconnect()
         self.protocol.setPulsepalParams.disconnect()
+        self.protocol.ardIOTriggered.disconnect()
+        self.protocol.ardIOCleared.disconnect()
         self.clearOutput()
         self.clearLED()
         self.status = "ready"
@@ -277,6 +285,10 @@ class Chamber(QObject):
     @Slot(int, float, float)
     def onSetPulsepalParams(self, evtid, dur, intv):
         self.setPulsepalParams.emit(self.name, evtid, dur, intv)
+
+    # @Slot(int, bool)
+    # def onArdIOTriggered(self, evtid, value):
+    #     self.ardIOTriggered.emit(evtid, value)
 
     @Slot(str, str, int)
     def onArdMsgReceived(self, cmbrname, msgtype, msg):
