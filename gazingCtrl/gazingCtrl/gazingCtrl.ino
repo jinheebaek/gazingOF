@@ -1,7 +1,7 @@
 #include "Arduino_LED_Matrix.h"
-#define NOUT 2
+#define NOUT 3
 
-int out[] = {6, 7};  // 1st for openephys, 2nd for laser
+int out[] = {6, 7, 8};  // 1st for openephys, 2nd for laser, 3rd for shocker
 
 String message;
 char inchar;
