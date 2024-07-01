@@ -140,12 +140,12 @@ class FrameLoader(QThread):
 
             # vid1 = "C:\Users\kimjg\Documents\Repository\gazingOF\eOF01_ct_ob.mp4"
             # vid2 = "C:\Users\kimjg\Documents\Repository\gazingOF\eOF01_ct_dm.mp4"
-            vid1 = "C:/Users/kimjg/Documents/Repository/gazingOF/eOF01_ct_dm.mp4"
-            vid2 = "C:/Users/kimjg/Documents/Repository/gazingOF/eOF01_ct_ob.mp4"
-            # self.cap1 = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-            # self.cap2 = cv2.VideoCapture(2, cv2.CAP_DSHOW)
-            self.cap1 = cv2.VideoCapture(vid1)
-            self.cap2 = cv2.VideoCapture(vid2)
+            # vid1 = "C:/Users/kimjg/Documents/Repository/gazingOF/eOF01_ct_dm.mp4"
+            # vid2 = "C:/Users/kimjg/Documents/Repository/gazingOF/eOF01_ct_ob.mp4"
+            # self.cap1 = cv2.VideoCapture(vid1)
+            # self.cap2 = cv2.VideoCapture(vid2)
+            self.cap1 = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+            self.cap2 = cv2.VideoCapture(2, cv2.CAP_DSHOW)
             if not self.cap1 or not self.cap1.isOpened():
                 time.sleep(1)
                 continue
@@ -176,7 +176,14 @@ class FrameLoader(QThread):
                 self.height2, self.width2, ch = frame2.shape
                 assert self.height1 == self.height2
 
-                frame = np.concatenate([frame1, frame2], axis=1)
+                # frame = np.concatenate([frame1, frame2], axis=1)
+                frame = np.concatenate([frame1[:, :-int(640 * 0.2), :], frame2[:, int(640 * 0.2):, :]], axis=1)
+                # frame = cv2.normalize(frame, None, alpha=32, beta=255, norm_type=cv2.NORM_MINMAX)
+                tmp = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                contrast = 1.5
+                brightness = 30
+                tmp[:, :, 2] = np.clip(contrast * tmp[:, :, 2] + brightness, 0, 255)
+                frame = cv2.cvtColor(tmp, cv2.COLOR_HSV2BGR)
 
                 if self.dlc_infer is None:
                     self.dlc_infer = self.dlc_live.init_inference(frame)
@@ -210,11 +217,13 @@ class FrameLoader(QThread):
                     pass
                     
                 img = QImage(frame,
-                             self.width1 * 2, self.height1, ch * self.width1 * 2,
+                            #  self.width1 * 2, self.height1, ch * self.width1 * 2,
+                             frame.shape[1], frame.shape[0], ch * frame.shape[1],
                              QImage.Format_BGR888)
                 
-                scaled_img = img.scaled(640 * 2, 480, Qt.KeepAspectRatio)
-
+                scaled_img = img.scaled(frame.shape[1], frame.shape[0], Qt.KeepAspectRatio)
+                # scaled_img = img.scaled(640 * 2, 480, Qt.KeepAspectRatio)
+     
                 self.frameUpdated.emit(scaled_img)
                 time.sleep(intv)
             self.dlc_infer = None
@@ -229,7 +238,8 @@ class FrameLoader(QThread):
 class VideoWriter(QObject):
     @Slot()
     def initialize(self):
-        self.width = 640 * 2
+        # self.width = 640 * 2
+        self.width = int(640 * 0.8) * 2
         self.height = 480
         self.frameRate = 15
 
@@ -303,7 +313,7 @@ class VideoWriter(QObject):
                 self.videoFile.replace(".mp4", "_transcode.mp4")
             )
 
-            cmd_tsfix = "mp4fpsmod -t {} -o {} {}".format(
+            cmd_tsfix = "mp4fpsmod -c -t {} -o {} {}".format(
                 self.videoFile.replace(".mp4", "_frametime.txt"),
                 self.videoFile,
                 self.videoFile.replace(".mp4", "_transcode.mp4")

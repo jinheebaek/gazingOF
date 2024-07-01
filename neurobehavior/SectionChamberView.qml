@@ -46,7 +46,7 @@ Item {
     Item {
         id: section_video
         anchors.top: sectionTitle.bottom
-        width: height * 640 * 2 / 480
+        width: height * 640 * 0.8 * 2 / 480
         height: Math.min(parent.height * 0.5, 480)
 
         Rectangle {

@@ -8,7 +8,7 @@ Item {
 
     property double resize_marker_len: 8
     property double border_width: 2
-    property double x_max: 640
+    property double x_max: 640 * 0.8 * 2
     property double y_max: 480
     property color color: "black"
 
