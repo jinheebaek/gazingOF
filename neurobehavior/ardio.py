@@ -14,6 +14,7 @@ class ArdIO(QObject):
     inputMsgReceived = Signal(int)
     outputMsgReceived = Signal(int)
     configMsgReceived = Signal(str)
+    tlaserMsgReceived = Signal(int)
 
     # def initialize(self):
     def __init__(self, parent=None):
@@ -90,6 +91,9 @@ class ArdIO(QObject):
                 self.outputMsgReceived.emit(msg)
             elif msg.startswith(b'c'):
                 self.configMsgReceived.emit(msg[1:].decode())
+            elif msg.startswith(b'l'):
+                t_laser = int(msg[1:].decode().strip())
+                self.tlaserMsgReceived(t_laser)
 
     @Slot()
     def sendMessage(self, msg):
@@ -132,6 +136,10 @@ class ArdIO(QObject):
             msg_off = self.encodeMsg("-", update_off)
             # self.ard.sendMessage(msg_off)
             self.sendMessage(msg_off)
+    
+    @Slot(int, bool)
+    def onArdResetTimer(self):
+        self.sendMessage("t".encode() + "\r\n".encode())
 
     @Slot()
     def clearOutput(self):

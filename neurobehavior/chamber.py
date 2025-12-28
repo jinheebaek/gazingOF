@@ -22,13 +22,15 @@ class Chamber(QObject):
     stateListChanged = Signal(list)
     inputChanged = Signal(str, bool, arguments=["channel", "value"])
     outputChanged = Signal(str, bool, arguments=["channel", "value"])
-    gazingAngleUpdated = Signal(float)
+    gazingAngleUpdated = Signal(float, float)
     stateEntered = Signal(str, str)
     stateExited = Signal(str, str)
+    laserTriggered = Signal(int)
 
     pulsepalTriggered = Signal(str, int, bool)
     setPulsepalParams = Signal(str, int, float, float)
     ardIOTriggered = Signal(int, bool)
+    ardResetTimer = Signal(int, bool)
     ardIOCleared = Signal()
 
     arduinoOutputRequested = Signal(bytes)
@@ -215,10 +217,12 @@ class Chamber(QObject):
         self.protocol.pulsepalTriggered.connect(self.onPulsepalTriggered)
         self.protocol.setPulsepalParams.connect(self.onSetPulsepalParams)
         self.protocol.ardIOTriggered.connect(self.ardIOTriggered)
+        self.protocol.ardResetTimer.connect(self.ardResetTimer)
         self.protocol.ardIOCleared.connect(self.ardIOCleared)
         self.protocol.startProtocol()
         self.inputChanged.connect(self.protocol.inputChanged)
         self.outputChanged.connect(self.protocol.outputChanged)
+        self.laserTriggered.connect(self.protocol.laserTriggered)
         self.gazingAngleUpdated.connect(self.protocol.gazingAngleUpdated)
         self.status = "running"
 
@@ -226,7 +230,8 @@ class Chamber(QObject):
     def stopProtocol(self):
         if self.protocol:
             self.inputChanged.disconnect(self.protocol.inputChanged)
-            self.outputChanged.disconnect(self.protocol.outputChanged)
+            self.outputChanged.disconnect(self.protocol.outputChanged)            
+            self.laserTriggered.disconnect(self.protocol.laserTriggered)
             self.gazingAngleUpdated.disconnect(self.protocol.gazingAngleUpdated)
             self.protocol.stopProtocol()
             self.protocol.clearOutputRequested.disconnect()
@@ -245,6 +250,7 @@ class Chamber(QObject):
             self.protocol.pulsepalTriggered.disconnect()
             self.protocol.setPulsepalParams.disconnect()
             self.protocol.ardIOTriggered.disconnect()
+            self.protocol.ardResetTimer.disconnect()
             self.protocol.ardIOCleared.disconnect()
             self.protocol = None
         self.clearOutput()
@@ -255,7 +261,8 @@ class Chamber(QObject):
     @Slot()
     def onProtocolFinished(self):
         self.inputChanged.disconnect(self.protocol.inputChanged)
-        self.outputChanged.disconnect(self.protocol.outputChanged)
+        self.outputChanged.disconnect(self.protocol.outputChanged)        
+        self.laserTriggered.disconnect(self.protocol.laserTriggered)
         self.protocol.clearOutputRequested.disconnect()
         self.protocol.updateOutputRequested.disconnect()
         self.protocol.resetOutputRequested.disconnect()
@@ -272,6 +279,7 @@ class Chamber(QObject):
         self.protocol.pulsepalTriggered.disconnect()
         self.protocol.setPulsepalParams.disconnect()
         self.protocol.ardIOTriggered.disconnect()
+        self.protocol.ardResetTimer.disconnect()
         self.protocol.ardIOCleared.disconnect()
         self.clearOutput()
         self.clearLED()
@@ -289,6 +297,10 @@ class Chamber(QObject):
     # @Slot(int, bool)
     # def onArdIOTriggered(self, evtid, value):
     #     self.ardIOTriggered.emit(evtid, value)
+
+    @Slot(int)
+    def onTLaserMsgReceived(self, tlaser):
+        self.laserTriggered.emit(tlaser)
 
     @Slot(str, str, int)
     def onArdMsgReceived(self, cmbrname, msgtype, msg):

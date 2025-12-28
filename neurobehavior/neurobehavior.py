@@ -165,6 +165,7 @@ class Neurobehavior(QObject):
         cmbr.pulsepalTriggered.connect(self.pp.onPulsepalTriggered)
         cmbr.setPulsepalParams.connect(self.pp.setPulsepalParams)
         cmbr.ardIOTriggered.connect(self.ard.onArdIOTriggered)
+        cmbr.ardResetTimer.connect(self.ard.onArdResetTimer)
         cmbr.ardIOCleared.connect(self.ard.clearOutput)
         self.updateOutput.connect(cmbr.onUpdateOutputBroadcast)
 
@@ -178,6 +179,8 @@ class Neurobehavior(QObject):
 
         cmbr.videoCtrl = VideoCtrl(self, int(name.lstrip("chamber")))
         cmbr.videoCtrl.gazingAngleUpdated.connect(cmbr.gazingAngleUpdated)
+
+        self.ard.tlaserMsgReceived.connect(cmbr.onTLaserMsgReceived)
 
         self.chambers[name] = cmbr
         self.chamberThreads[name] = cmbrThread
