@@ -32,7 +32,7 @@ class Protocol(QObject):
 
     inputChanged = Signal(str, bool, arguments=["channel", "value"])
     outputChanged = Signal(str, bool, arguments=["channel", "value"])
-    gazingAngleUpdated = Signal(float)
+    gazingAngleUpdated = Signal(float, float)
 
     stateEntered = Signal(str)
     stateExited = Signal(str)
@@ -40,6 +40,7 @@ class Protocol(QObject):
     pulsepalTriggered = Signal(int, bool)
     setPulsepalParams = Signal(int, float, float)
     ardIOTriggered = Signal(int, bool)
+    ardResetTimer = Signal(int, bool)
     ardIOCleared = Signal()
 
     name = ""
@@ -111,6 +112,10 @@ class Protocol(QObject):
     @Slot()
     def updateParams(self, params):
         self.params.update(params)
+
+    @Slot()
+    def laserTriggered(self, tlaser):
+        return
 
     @Slot()
     def startProtocol(self):
@@ -255,6 +260,9 @@ class Timer(QObject):
 
         self.timer = QTimer()
         self.timer_duration = 0
+
+    def getT0(self):
+        return self.t0
 
     def setDuration(self, duration):
         self.timer_duration = duration
