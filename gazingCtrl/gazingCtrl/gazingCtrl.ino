@@ -7,6 +7,9 @@ String message;
 char inchar;
 char inchar_prev;
 
+int t_ref;
+int t_laser_on;
+
 int nOutByte = ceil(NOUT / 8.0);
 ArduinoLEDMatrix matrix;
 
@@ -41,6 +44,7 @@ void setup() {
   Serial.begin(115200);
   Serial.flush();
   matrix.begin();
+  t_ref = milis();
 }
 
 void setLED() {
@@ -64,7 +68,14 @@ void setOut(const char* bits) {
     num = *bits++;
     int nbit = min((NOUT - (ibyte * 8)), 8);
     for (int ibit = 0; ibit < nbit; ibit++) {
-      if (num & 1) digitalWrite(out[ibit + ibyte * 8], HIGH);
+      if (num & 1) {
+        digitalWrite(out[ibit + ibyte * 8], HIGH);
+        if (ibit == 1) {  // for 
+            t_laser_on = millis() - t_ref;
+            Serial.print('l');
+            Serial.println(t_laser_on, 6);
+        }
+      }
       else digitalWrite(out[ibit + ibyte * 8], LOW);
       num >>= 1;
     }
@@ -109,6 +120,8 @@ void check_msg(String &m) {
     setOn(m.c_str());
   } else if ((m.charAt(0) == '-') && (m.length() == nOutByte + 1)) {
     setOff(m.c_str());
+  } else if ((m.charAt(0) == 't') && (m.length() == 1)) {
+    t_ref = millis();
   } else {
     Serial.print("Wrong msg: ");
     Serial.println(m);

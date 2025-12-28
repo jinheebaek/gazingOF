@@ -52,5 +52,5 @@ class VideoViewItem(QQuickPaintedItem):
             self._conVideoCtrl = None
 
         if self.isVisible() and self._chamber and self._chamber.videoCtrl:
-            self._conVideoCtrl = self._chamber.videoCtrl.frameUpdated.connect(
+            self._conVideoCtrl = self._chamber.videoCtrl.frameAnnotatedUpdated.connect(
                 self.updateFrame)
