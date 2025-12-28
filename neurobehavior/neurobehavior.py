@@ -179,8 +179,10 @@ class Neurobehavior(QObject):
 
         cmbr.videoCtrl = VideoCtrl(self, int(name.lstrip("chamber")))
         cmbr.videoCtrl.gazingAngleUpdated.connect(cmbr.gazingAngleUpdated)
+        self.chamberStartSession.connect(cmbr.videoCtrl.onSessionStarted)
 
         self.ard.tlaserMsgReceived.connect(cmbr.onTLaserMsgReceived)
+        self.ard.ardT0Reset.connect(cmbr.onArdT0Reset)
 
         self.chambers[name] = cmbr
         self.chamberThreads[name] = cmbrThread

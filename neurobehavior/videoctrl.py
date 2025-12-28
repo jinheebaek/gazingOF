@@ -26,6 +26,8 @@ class VideoCtrl(QObject):
     requestRecordAnnotatedStart = Signal(str)
     requestRecordAnnotatedStop = Signal()
 
+    # sessionStarted = Signal()
+
     # cmd = "ffmpeg -use_wallclock_as_timestamps 1 -f mjpeg -i http://192.168.100.{}:8081/?action=stream -vcodec libx264 -y {}"
 
     def __init__(self, app, video_index):
@@ -38,8 +40,10 @@ class VideoCtrl(QObject):
         self.frameLoader.frameAnnotatedUpdated.connect(self.frameAnnotatedUpdated)
         self.frameLoader.gazingAngleUpdated.connect(self.gazingAngleUpdated)
         self.frameLoader.connectionChanged.connect(self.onConnectionChanged)
-        self.frameLoader.start()
+        # self.frameLoader.start()
         self.is_connected = False
+
+        # self.sessionStarted.connect(self.frameLoader.onSessionStarted)
 
         # self.videoWriterThread = None
         # self.videoWriter = None
@@ -51,7 +55,7 @@ class VideoCtrl(QObject):
         self.requestRecordStart.connect(self.videoWriter.recordStart)
         self.requestRecordStop.connect(self.videoWriter.recordStop)
         self.videoWriterThread.started.connect(self.videoWriter.initialize)
-        self.videoWriterThread.start()
+        # self.videoWriterThread.start()
 
         self.videoWriterThread_annotated = QThread()
         self.videoWriter_annotated = VideoWriter()
@@ -59,7 +63,7 @@ class VideoCtrl(QObject):
         self.requestRecordAnnotatedStart.connect(self.videoWriter_annotated.recordStart)
         self.requestRecordAnnotatedStop.connect(self.videoWriter_annotated.recordStop)
         self.videoWriterThread_annotated.started.connect(self.videoWriter_annotated.initialize)
-        self.videoWriterThread_annotated.start()
+        # self.videoWriterThread_annotated.start()
         
     def stop(self):
         self.recordStop()
@@ -73,6 +77,14 @@ class VideoCtrl(QObject):
         self.frameLoader.stop()
         self.frameLoader.quit()
         self.frameLoader.wait()
+
+    @Slot()
+    def onSessionStarted(self):
+        self.frameLoader.start()
+        self.videoWriterThread.start()
+        self.videoWriterThread_annotated.start()
+
+        # self.sessionStarted.emit()
 
     @Slot(bool)
     def onConnectionChanged(self, is_connected):
@@ -163,6 +175,10 @@ class FrameLoader(QThread):
         self.dlc_live = DLCLive("C:/Users/kimjg/Documents/Repository/gazingOF/model", processor=self.dlc_proc)
         self.dlc_infer = None
 
+    # @Slot()
+    # def onSessionStarted(self):
+    #     self.active = True
+
     def run(self, record=False):
         while True:
             self.mutex.lock()
@@ -177,21 +193,28 @@ class FrameLoader(QThread):
             # vid2 = "C:/Users/kimjg/Documents/Repository/gazingOF/eOF01_ct_ob.mp4"
             # self.cap1 = cv2.VideoCapture(vid1)
             # self.cap2 = cv2.VideoCapture(vid2)
-            self.cap1 = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-            self.cap2 = cv2.VideoCapture(2, cv2.CAP_DSHOW)
-            if not self.cap1 or not self.cap1.isOpened():
-                time.sleep(1)
-                continue
-                # break
-            if not self.cap2 or not self.cap2.isOpened():
+            vid = "C:/Users/kimjg/Documents/Research/opto_nphr/nOF/nOF07_ctrl/2025-12-17/2025-12-17_10-21-44_video1.mp4"
+            self.cap = cv2.VideoCapture(vid)
+            # self.cap1 = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+            # self.cap2 = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+            # if not self.cap1 or not self.cap1.isOpened():
+            #     time.sleep(1)
+            #     continue
+            #     # break
+            # if not self.cap2 or not self.cap2.isOpened():
+            #     time.sleep(1)
+            #     continue
+            #     # break
+            if not self.cap or not self.cap.isOpened():
                 time.sleep(1)
                 continue
                 # break
 
             self.connectionChanged.emit(True)   
             intv = 1 / self.frameRate
-            self.cap1.set(cv2.CAP_PROP_FPS, self.frameRate)
-            self.cap2.set(cv2.CAP_PROP_FPS, self.frameRate)
+            # self.cap1.set(cv2.CAP_PROP_FPS, self.frameRate)
+            # self.cap2.set(cv2.CAP_PROP_FPS, self.frameRate)
+            self.cap.set(cv2.CAP_PROP_FPS, self.frameRate)
             while True:
                 self.mutex.lock()
                 if not self.active:
@@ -199,25 +222,33 @@ class FrameLoader(QThread):
                     break
                 self.mutex.unlock()
 
-                ret1, frame1 = self.cap1.read()
-                ret2, frame2 = self.cap2.read()
+                # ret1, frame1 = self.cap1.read()
+                # ret2, frame2 = self.cap2.read()
+                ret, frame = self.cap.read()
                 t_frame = time.time()
-                if not ret1 or not ret2: 
+                # if not ret1 or not ret2: 
+                #     self.connectionChanged.emit(False)
+                #     break
+                if not ret: 
                     self.connectionChanged.emit(False)
                     break
 
-                self.height1, self.width1, ch = frame1.shape
-                self.height2, self.width2, ch = frame2.shape
-                assert self.height1 == self.height2
+                # self.height1, self.width1, ch = frame1.shape
+                # self.height2, self.width2, ch = frame2.shape
+                # assert self.height1 == self.height2
 
-                # frame = np.concatenate([frame1, frame2], axis=1)
-                frame = np.concatenate([frame1[:, :-int(640 * 0.2), :], frame2[:, int(640 * 0.2):, :]], axis=1)
+                # # frame = np.concatenate([frame1, frame2], axis=1)
+                # frame = np.concatenate([frame1[:, :-int(640 * 0.2), :], frame2[:, int(640 * 0.2):, :]], axis=1)
+                # # frame = cv2.normalize(frame, None, alpha=32, beta=255, norm_type=cv2.NORM_MINMAX)
+
                 # frame = cv2.normalize(frame, None, alpha=32, beta=255, norm_type=cv2.NORM_MINMAX)
+                _, _, ch = frame.shape
+
                 tmp = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
                 contrast = 1.5
                 brightness = 30
                 tmp[:, :, 2] = np.clip(contrast * tmp[:, :, 2] + brightness, 0, 255)
-                frame = cv2.cvtColor(tmp, cv2.COLOR_HSV2BGR)
+                # frame = cv2.cvtColor(tmp, cv2.COLOR_HSV2BGR)
                 frame_annotated = frame.copy()
 
                 if self.dlc_infer is None:

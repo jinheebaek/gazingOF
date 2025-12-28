@@ -44,7 +44,7 @@ void setup() {
   Serial.begin(115200);
   Serial.flush();
   matrix.begin();
-  t_ref = milis();
+  t_ref = millis();
 }
 
 void setLED() {
@@ -73,7 +73,7 @@ void setOut(const char* bits) {
         if (ibit == 1) {  // for 
             t_laser_on = millis() - t_ref;
             Serial.print('l');
-            Serial.println(t_laser_on, 6);
+            Serial.println(t_laser_on);
         }
       }
       else digitalWrite(out[ibit + ibyte * 8], LOW);
@@ -91,7 +91,14 @@ void setOn(const char* bits) {
     num = *bits++;
     int nbit = min((NOUT - (ibyte * 8)), 8);
     for (int ibit = 0; ibit < nbit; ibit++) {
-      if (num & 1) digitalWrite(out[ibit + ibyte * 8], HIGH);
+      if (num & 1) {
+        digitalWrite(out[ibit + ibyte * 8], HIGH);
+        if (ibit == 1) {  // for 
+            t_laser_on = millis() - t_ref;
+            Serial.print('l');
+            Serial.println(t_laser_on);
+        }
+      }
       num >>= 1;
     }
   }
