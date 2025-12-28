@@ -14,7 +14,8 @@ class ArdIO(QObject):
     inputMsgReceived = Signal(int)
     outputMsgReceived = Signal(int)
     configMsgReceived = Signal(str)
-    tlaserMsgReceived = Signal(int)
+    tlaserMsgReceived = Signal(float)
+    ardT0Reset = Signal(float)
 
     # def initialize(self):
     def __init__(self, parent=None):
@@ -29,6 +30,7 @@ class ArdIO(QObject):
         self.port = "COM4"
         self.outputBits = QBitArray(2)
         self.connectArd()
+        self.t0_msg = 0
 
     @Slot()
     def setPort(self, port):
@@ -93,12 +95,15 @@ class ArdIO(QObject):
                 self.configMsgReceived.emit(msg[1:].decode())
             elif msg.startswith(b'l'):
                 t_laser = int(msg[1:].decode().strip())
-                self.tlaserMsgReceived(t_laser)
+                t_msg_delay = (time.time() - self.t0_msg) / 2
+                self.tlaserMsgReceived.emit(self.t0_msg + t_msg_delay)
 
     @Slot()
     def sendMessage(self, msg):
         # qDebug("to Ard: {}".format(msg))
         if self.is_connected:
+            if msg == self.encodeMsg("+", [0, 1, 0, 0, 0, 0, 0, 0]):
+                self.t0_msg = time.time()
             self.ard.write(msg)
 
     @Slot(int, list, result=bytes)
@@ -140,6 +145,7 @@ class ArdIO(QObject):
     @Slot(int, bool)
     def onArdResetTimer(self):
         self.sendMessage("t".encode() + "\r\n".encode())
+        self.ardT0Reset.emit(time.time())
 
     @Slot()
     def clearOutput(self):

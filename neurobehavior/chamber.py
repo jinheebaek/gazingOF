@@ -25,12 +25,13 @@ class Chamber(QObject):
     gazingAngleUpdated = Signal(float, float)
     stateEntered = Signal(str, str)
     stateExited = Signal(str, str)
-    laserTriggered = Signal(int)
+    laserTriggered = Signal(float)
+    ardT0Reset = Signal(float)
 
     pulsepalTriggered = Signal(str, int, bool)
     setPulsepalParams = Signal(str, int, float, float)
     ardIOTriggered = Signal(int, bool)
-    ardResetTimer = Signal(int, bool)
+    ardResetTimer = Signal()
     ardIOCleared = Signal()
 
     arduinoOutputRequested = Signal(bytes)
@@ -223,6 +224,7 @@ class Chamber(QObject):
         self.inputChanged.connect(self.protocol.inputChanged)
         self.outputChanged.connect(self.protocol.outputChanged)
         self.laserTriggered.connect(self.protocol.laserTriggered)
+        self.ardT0Reset.connect(self.protocol.ardT0Reset)
         self.gazingAngleUpdated.connect(self.protocol.gazingAngleUpdated)
         self.status = "running"
 
@@ -232,6 +234,7 @@ class Chamber(QObject):
             self.inputChanged.disconnect(self.protocol.inputChanged)
             self.outputChanged.disconnect(self.protocol.outputChanged)            
             self.laserTriggered.disconnect(self.protocol.laserTriggered)
+            self.ardT0Reset.disconnect(self.protocol.ardT0Reset)
             self.gazingAngleUpdated.disconnect(self.protocol.gazingAngleUpdated)
             self.protocol.stopProtocol()
             self.protocol.clearOutputRequested.disconnect()
@@ -263,6 +266,7 @@ class Chamber(QObject):
         self.inputChanged.disconnect(self.protocol.inputChanged)
         self.outputChanged.disconnect(self.protocol.outputChanged)        
         self.laserTriggered.disconnect(self.protocol.laserTriggered)
+        self.ardT0Reset.disconnect(self.protocol.ardT0Reset)
         self.protocol.clearOutputRequested.disconnect()
         self.protocol.updateOutputRequested.disconnect()
         self.protocol.resetOutputRequested.disconnect()
@@ -301,6 +305,10 @@ class Chamber(QObject):
     @Slot(int)
     def onTLaserMsgReceived(self, tlaser):
         self.laserTriggered.emit(tlaser)
+
+    @Slot(int)
+    def onArdT0Reset(self, t0):
+        self.ardT0Reset.emit(t0)
 
     @Slot(str, str, int)
     def onArdMsgReceived(self, cmbrname, msgtype, msg):
