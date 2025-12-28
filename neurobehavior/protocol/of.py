@@ -47,6 +47,9 @@ class ProtocolOF(Protocol):
         self.shock_dur_timer.setSingleShot(True)
         self.shock_dur_timer.timeout.connect(self.shock_off)
 
+        self.laser_prtc_on = []
+        self.t_ref = 0
+
     def finalize(self):
         super().finalize()
         self.gazingAngleUpdated.disconnect()
@@ -69,6 +72,25 @@ class ProtocolOF(Protocol):
         self.ardIOTriggered.emit(2, False) 
         self.shock_intv_timer.start()
 
+    def laserTriggered(self, tlaser):
+        t_ard_on = tlaser / 1e3  # convert to sec
+        try:
+            t_frame, t_gazing_on = self.laser_prtc_on[0]
+            self.laser_prtc_on = self.laser_prtc_on[1:]
+        except:
+            print("no gazing time for laser trigger")
+            return
+        
+        t_frame -= self.timer.getT0()
+        t_gazing_on -= self.timer.getT0()
+        t_ard_on -= self.timer.getT0()
+        
+        self.recordData("laser_on", {
+            "t_frame": t_frame,
+            "t_gazing": t_gazing_on,  
+            "t_laser": t_ard_on
+        })
+        print("t_frame: {}, t_gazing: {}, t_laser: {}".format(t_frame, t_gazing_on, t_ard_on))
 
 class StateHab(State):
     def initialize(self):
@@ -77,6 +99,8 @@ class StateHab(State):
     def onEntered(self):
         self.protocol.ardIOTriggered.emit(0, True)
         self.startTimer(self.protocol.params["habituation"])
+        self.protocol.ardResetTimer.emit()
+        self.protocol.t_ref = time.time()
 
 
 class StateCond(State):
@@ -94,7 +118,7 @@ class StateCond(State):
         #     self.protocol.params["session_duration"] - self.protocol.params["habituation"])
 
     @Slot(float)
-    def onGazingAngleUpdated(self, angle):
+    def onGazingAngleUpdated(self, t_frame, angle):
         if not self.gazingCtrl:
             return
         
@@ -108,6 +132,7 @@ class StateCond(State):
                 "timestamp": self.protocol.timer.elapsed(),
                 "event": "onset"
             })
+            self.protocol.laser_prtc_on.append([t_frame - self.protocol.t_ref, time.time() - self.protocol.t_ref])
         if angle >= self.protocol.params["gazing_angle_threshold"] and self.protocol.is_gazing:
             print("laser off")
             # self.protocol.pulsepalTriggered.emit(0, False)
