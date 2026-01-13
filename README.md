@@ -1,1 +1,2 @@
-Developed for Jaegon's closed-loop optogenetics with dlc-live
+- Kim et al., Science, 2026
+- Developed for Jaegon's closed-loop optogenetics with dlc-live
